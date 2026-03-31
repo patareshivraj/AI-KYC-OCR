@@ -172,21 +172,36 @@ class KYCValidator:
         signals = comparison.get("signals", [])
 
         doc_issues: List[str] = []
+        fraud_hits = 0
+        
         for doc_type, val in per_doc.items():
-            if isinstance(val, dict) and not val.get("is_valid", True):
-                doc_issues.extend([f"[{doc_type.upper()}] {i}" for i in val.get("issues", [])])
+            if isinstance(val, dict):
+                issues = val.get("issues", [])
+                if not val.get("is_valid", True) or issues:
+                    doc_issues.extend([f"[{doc_type.upper()}] {i}" for i in issues])
+                    # Track forensics/fraud triggers based on known keywords
+                    if any("FFT" in i or "Moir" in i or "Analysis" in i or "EXIF" in i or "Photo" in i for i in issues):
+                        fraud_hits += 1
 
         all_signals = signals + doc_issues
 
-        if comp_decision == "FAIL" or avg_doc_score < 40:
+        if comp_decision == "FAIL" or avg_doc_score < 40 or fraud_hits >= 2:
             verdict = "REJECT"
         elif comp_decision == "REVIEW" or avg_doc_score < 70 or doc_issues:
             verdict = "REVIEW"
         else:
             verdict = "APPROVE"
 
+        # Explicit Score Derivations
+        risk_score = 100 - avg_doc_score
+        identity_score = comparison.get("average_name_score", 0) if comparison else 0
+        fraud_score = min(100, fraud_hits * 50)
+
         return {
             "verdict": verdict,
+            "risk_score": risk_score,
+            "fraud_score": fraud_score,
+            "identity_score": identity_score,
             "average_document_score": avg_doc_score,
             "comparison_decision": comp_decision,
             "signals": all_signals,
