@@ -530,8 +530,8 @@ async def _process_single_upload(
 
     images = file_to_images(upload, content, doc_type)
     
-    # Run Forensics (EXIF + ELA) on first page/image
-    forensics = run_forensics(images[0]) if images else {"is_tampered": False, "reason": ""}
+    # Run Forensics across all extracted pages
+    forensics = run_forensics(images)
 
     raw, used_provider = await run_ocr(doc_type, images, provider)
     normalized = normalize_document_fields(doc_type, raw)
@@ -586,7 +586,7 @@ async def ocr_pan(
     content = await file.read()
     ensure_file_size(file, content)
     images = file_to_images(file, content, "pan")
-    forensics = run_forensics(images[0]) if images else {"is_tampered": False, "reason": ""}
+    forensics = run_forensics(images)
     raw, _ = await run_ocr("pan", images, provider)
     normalized = normalize_document_fields("pan", raw)
     return build_local_validation_response("pan", raw, normalized, forensics)
@@ -603,7 +603,7 @@ async def ocr_aadhaar(
     content = await file.read()
     ensure_file_size(file, content)
     images = file_to_images(file, content, "aadhaar")
-    forensics = run_forensics(images[0]) if images else {"is_tampered": False, "reason": ""}
+    forensics = run_forensics(images)
     raw, _ = await run_ocr("aadhaar", images, provider)
     normalized = normalize_document_fields("aadhaar", raw)
     return build_local_validation_response("aadhaar", raw, normalized, forensics)
@@ -628,7 +628,7 @@ async def ocr_bank(
     content = await file.read()
     ensure_file_size(file, content)
     images = file_to_images(file, content, "bank")
-    forensics = run_forensics(images[0]) if images else {"is_tampered": False, "reason": ""}
+    forensics = run_forensics(images)
     raw, _ = await run_ocr("bank", images, provider)
     normalized = normalize_document_fields("bank", raw)
     return build_local_validation_response("bank", raw, normalized, forensics)

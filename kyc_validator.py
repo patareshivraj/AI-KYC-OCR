@@ -477,9 +477,10 @@ class KYCValidator:
             issues.append(f"DOB invalid or missing (got: '{dob}')")
             score -= 15
 
-        if not data.get("address"):
-            issues.append("Address is missing")
-            score -= 10
+        # Address validation temporarily disabled by request
+        # if not data.get("address"):
+        #     issues.append("Address is missing")
+        #     score -= 10
 
         score = max(score, 0)
         return {
