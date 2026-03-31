@@ -172,30 +172,40 @@ class KYCValidator:
         signals = comparison.get("signals", [])
 
         doc_issues: List[str] = []
-        fraud_hits = 0
+        fraud_penalty = 0
         
         for doc_type, val in per_doc.items():
             if isinstance(val, dict):
                 issues = val.get("issues", [])
                 if not val.get("is_valid", True) or issues:
                     doc_issues.extend([f"[{doc_type.upper()}] {i}" for i in issues])
-                    # Track forensics/fraud triggers based on known keywords
-                    if any("FFT" in i or "Moir" in i or "Analysis" in i or "EXIF" in i or "Photo" in i for i in issues):
-                        fraud_hits += 1
+                    for i in issues:
+                        # Physical Forensics (Heavy Fraud Penalty)
+                        if any(kw in i for kw in ["FFT", "Moir", "Analysis", "EXIF", "Photo", "tampered"]):
+                            fraud_penalty += 50
+                        # Logical Forgery (Checksum failed / Fake ID formats)
+                        elif any(kw in i.lower() for kw in ["checksum", "invalid format"]):
+                            fraud_penalty += 30
+                        # Missing crucial data
+                        elif "missing" in i.lower() or "not found" in i.lower():
+                            fraud_penalty += 10
 
         all_signals = signals + doc_issues
+        
+        # Explicit Score Derivations
+        identity_score = comparison.get("average_name_score", 0) if comparison else 0
+        fraud_score = min(100, fraud_penalty)
+        
+        # Comprehensive Risk Score (Combines doc errors, identity mismatch, and fraud detection)
+        # Formula: (Points lost from docs) + (Points lost from identity match) + (Fraud Score)
+        risk_score = min(100, int((100 - avg_doc_score) + (100 - identity_score) + fraud_score))
 
-        if comp_decision == "FAIL" or avg_doc_score < 40 or fraud_hits >= 2:
+        if comp_decision == "FAIL" or avg_doc_score < 40 or fraud_score >= 50 or risk_score >= 70:
             verdict = "REJECT"
-        elif comp_decision == "REVIEW" or avg_doc_score < 70 or doc_issues:
+        elif comp_decision == "REVIEW" or avg_doc_score < 75 or doc_issues or risk_score >= 30:
             verdict = "REVIEW"
         else:
             verdict = "APPROVE"
-
-        # Explicit Score Derivations
-        risk_score = 100 - avg_doc_score
-        identity_score = comparison.get("average_name_score", 0) if comparison else 0
-        fraud_score = min(100, fraud_hits * 50)
 
         return {
             "verdict": verdict,
