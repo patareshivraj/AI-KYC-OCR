@@ -181,10 +181,10 @@ class KYCValidator:
                     doc_issues.extend([f"[{doc_type.upper()}] {i}" for i in issues])
                     for i in issues:
                         # Physical Forensics (Heavy Fraud Penalty)
-                        if any(kw in i for kw in ["FFT", "Moir", "Analysis", "EXIF", "Photo", "tampered"]):
+                        if any(kw in i for kw in ["FFT", "Moir", "Analysis", "EXIF", "Photo", "tampered", "Tampered"]):
                             fraud_penalty += 50
                         # Logical Forgery (Checksum failed / Fake ID formats)
-                        elif any(kw in i.lower() for kw in ["checksum", "invalid format"]):
+                        elif any(kw in i.lower() for kw in ["checksum", "invalid"]):
                             fraud_penalty += 30
                         # Missing crucial data
                         elif "missing" in i.lower() or "not found" in i.lower():
