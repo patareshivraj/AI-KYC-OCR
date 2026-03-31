@@ -38,74 +38,96 @@ Image Upload -> Metadata Scan -> Compression Math -> FFT Moiré Check -> Cloud L
 
 ### Overall System Flow
 ```text
-[ Client Uploads Docs ]
-          │
-          ▼
-   [ Ingress Router ]
-          │
-          ▼
-  < Image Forensics > ──(Tampered)──> [ Fraud Signal 🚨 ]
-          │                                  │
-       (Clean)                               │
-          │                                  │
-          ▼                                  │
-[ Vision LLM Extraction ] <──────────────────┘
-          │
-          ▼
-[ Data Cleaner & Normalizer ]
-          │
-          ▼
-[ Deterministic Risk Engine ]
-          │
-          ▼
-[ Final KYC JSON Response ]
+┌─────────────────────────┐
+│  Client Uploads Docs    │
+└────────────┬────────────┘
+             ▼
+┌─────────────────────────┐
+│     Ingress Router      │
+└────────────┬────────────┘
+             ▼
+      [Image Forensics]
+       /             \
+ [Tampered]        [Clean]
+     /                 \
+    ▼                   ▼
+┌──────────────┐   ┌───────────────────────┐
+│ Fraud Signal │   │ Vision LLM Extraction │
+└──────────────┘   └───────────┬───────────┘
+                               ▼
+                   ┌─────────────────────────┐
+                   │ Data Clean & Normalize  │
+                   └───────────┬───────────┘
+                               ▼
+                   ┌─────────────────────────┐
+                   │ Deterministic Validator │
+                   └───────────┬───────────┘
+                               ▼
+                   ┌─────────────────────────┐
+                   │ Final KYC JSON Response │
+                   └─────────────────────────┘
 ```
 
 ### Data Pipeline & Failover
 ```text
-[ Image Bytes ]
-       │
+┌─────────────┐
+│ Image Bytes │
+└──────┬──────┘
        ▼
-< Groq Vision OK? > ──(Timeout/Fail)──> [ Ollama Local Vision ]
-       │                                           │
-     (Yes)                                         │
-       │                                           │
-       ▼                                           │
-[ Cloud JSON Output ] <────────────────────────────┘
-       │
+[Groq Cloud Vision] ─── (Timeout/Error) ───> ┌───────────────────┐
+       │                                     │ Local Ollama GPU  │
+     (OK)                                    └─────────┬─────────┘
+       │                                               │
+       ▼                                               │
+┌───────────────┐                                      │
+│  JSON Output  │ <────────────────────────────────────┘
+└──────┬────────┘
        ▼
-[ Regex / Masking ]
-       │
+┌───────────────┐
+│ Regex Cleanup │
+└──────┬────────┘
        ▼
-[ Scoring Engine ]
+┌───────────────┐
+│ Scoring Engine│
+└───────────────┘
 ```
 
 ### Decision Logic
 ```text
-[ Document Base Score: 100 ]
-             │
-             ▼
-  < Forensics Triggered? > ──(Yes)──> [ Score -40 ]
-             │                               │
-            (No)                             │
-             │                               │
-             ▼                               │
-  < Format/Regex Valid? > <──────────────────┘
-             │
-          (Yes/No) ──(If No)──> [ Score -20 ]
-             │
-             ▼
- < Cross-Doc Name Match? >
-             │
-       (Match < 70%) ─────────> [ Score -30 ]
-             │
-             ▼
-    < Final Score < 40? >
-             │
-      (Yes)─────(No)
-        │         │
-        ▼         ▼
-    [REJECT]  [APPROVE/REVIEW]
+                           ┌──────────────────┐
+                           │ Base Score: 100  │
+                           └────────┬─────────┘
+                                    ▼
+                          [Forensics Triggered?]
+                           /                  \
+                        (Yes)                (No)
+                         /                      \
+                        ▼                        ▼
+               ┌──────────┐            [Format/Regex Valid?]
+               │Score -40 │             /                 \
+               └────┬─────┘          (No)                (Yes)
+                    │                /                     \
+                    │               ▼                       ▼
+                    │      ┌──────────┐        [Cross-Doc Name Match?]
+                    │      │Score -20 │           /                \
+                    │      └────┬─────┘     (< 70% Match)      (> 70% Match)
+                    │           │               /                    \
+                    │           │              ▼                      ▼
+                    │           │     ┌──────────┐             ┌────────────┐
+                    │           │     │Score -30 │             │ No Penalty │
+                    │           │     └────┬─────┘             └──────┬─────┘
+                    │           │          │                          │
+                    └───────────┴──────────┴──────────────────────────┘
+                                    │
+                                    ▼
+                         [Final Score < 40?]
+                           /              \
+                        (Yes)            (No)
+                         /                  \
+                        ▼                    ▼
+               ┌──────────┐            ┌───────────────┐
+               │  REJECT  │            │ REVIEW/APPROVE│
+               └──────────┘            └───────────────┘
 ```
 
 ## Setup & Installation
