@@ -37,45 +37,75 @@ Image Upload -> Metadata Scan -> Compression Math -> FFT Moiré Check -> Cloud L
 ## Flowcharts
 
 ### Overall System Flow
-```mermaid
-graph TD
-    A[Client Uploads Docs] --> B(Ingress Router)
-    B --> C{Image Forensics}
-    C -->|Tampered| D[Fraud Signal 🚨]
-    C -->|Clean| E[Vision LLM Extraction]
-    D --> E
-    E --> F[Data Cleaner & Normalizer]
-    F --> G[Deterministic Risk Engine]
-    G --> H[Final KYC JSON Response]
+```text
+[ Client Uploads Docs ]
+          │
+          ▼
+   [ Ingress Router ]
+          │
+          ▼
+  < Image Forensics > ──(Tampered)──> [ Fraud Signal 🚨 ]
+          │                                  │
+       (Clean)                               │
+          │                                  │
+          ▼                                  │
+[ Vision LLM Extraction ] <──────────────────┘
+          │
+          ▼
+[ Data Cleaner & Normalizer ]
+          │
+          ▼
+[ Deterministic Risk Engine ]
+          │
+          ▼
+[ Final KYC JSON Response ]
 ```
 
 ### Data Pipeline & Failover
-```mermaid
-graph LR
-    A[Image Bytes] --> B{Groq Vision OK?}
-    B -->|Yes| C[Cloud JSON Output]
-    B -->|Timeout/RateLimit| D[Ollama Local Vision]
-    D --> C
-    C --> E[Regex Regex/Masking]
-    E --> F[Scoring Engine]
+```text
+[ Image Bytes ]
+       │
+       ▼
+< Groq Vision OK? > ──(Timeout/Fail)──> [ Ollama Local Vision ]
+       │                                           │
+     (Yes)                                         │
+       │                                           │
+       ▼                                           │
+[ Cloud JSON Output ] <────────────────────────────┘
+       │
+       ▼
+[ Regex / Masking ]
+       │
+       ▼
+[ Scoring Engine ]
 ```
 
 ### Decision Logic
-```mermaid
-graph TD
-    A[Document Base Score: 100] --> B{Forensics Triggered?}
-    B -->|Yes| C[Score -40]
-    B -->|No| D{Format/Regex Valid?}
-    C --> D
-    D -->|No| E[Score -20]
-    D -->|Yes| F{Cross-Doc Name Match?}
-    E --> F
-    F -->|<70% Match| G[Score -30]
-    F -->|>70% Match| H[Score calculated]
-    G --> H
-    H --> I{Final Score < 40?}
-    I -->|Yes| J[REJECT]
-    I -->|No| K[APPROVE / REVIEW]
+```text
+[ Document Base Score: 100 ]
+             │
+             ▼
+  < Forensics Triggered? > ──(Yes)──> [ Score -40 ]
+             │                               │
+            (No)                             │
+             │                               │
+             ▼                               │
+  < Format/Regex Valid? > <──────────────────┘
+             │
+          (Yes/No) ──(If No)──> [ Score -20 ]
+             │
+             ▼
+ < Cross-Doc Name Match? >
+             │
+       (Match < 70%) ─────────> [ Score -30 ]
+             │
+             ▼
+    < Final Score < 40? >
+             │
+      (Yes)─────(No)
+        │         │
+        ▼         ▼
+    [REJECT]  [APPROVE/REVIEW]
 ```
 
 ## Setup & Installation
