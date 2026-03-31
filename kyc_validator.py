@@ -68,21 +68,31 @@ class KYCValidator:
     #  PUBLIC API — called by main.py
     # =====================================================================
 
-    def validate_document(self, doc_type: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_document(self, doc_type: str, data: Dict[str, Any], forensics: Dict[str, Any] = None) -> Dict[str, Any]:
         """Validate a single normalized document. Returns a structured result."""
         if doc_type == "pan":
-            return self._validate_pan(data)
-        if doc_type == "aadhaar":
-            return self._validate_aadhaar(data)
-        if doc_type == "bank":
-            return self._validate_bank(data)
-        return {
-            "document_type": doc_type,
-            "is_valid": False,
-            "issues": ["Unknown document type"],
-            "score": 0,
-            "summary": "unknown",
-        }
+            res = self._validate_pan(data)
+        elif doc_type == "aadhaar":
+            res = self._validate_aadhaar(data)
+        elif doc_type == "bank":
+            res = self._validate_bank(data)
+        else:
+            res = {
+                "document_type": doc_type,
+                "is_valid": False,
+                "issues": ["Unknown document type"],
+                "score": 0,
+                "summary": "unknown",
+            }
+            
+        # ── Apply Forensics Penalties ──
+        if forensics and forensics.get("is_tampered"):
+            res["is_valid"] = False
+            res["issues"].append(forensics.get("reason", "Forensics detected image tampering"))
+            res["score"] = max(0, res["score"] - 40)
+            res["summary"] = self._score_summary(res["score"])
+            
+        return res
 
     def compare_documents(
         self,

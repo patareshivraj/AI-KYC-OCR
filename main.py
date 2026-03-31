@@ -25,6 +25,7 @@ except ImportError:
 
 from kyc_validator import KYCValidator
 from sandbox_client import SandboxClient
+from image_forensics import run_forensics
 
 load_dotenv(override=True)
 
@@ -501,14 +502,16 @@ def build_local_validation_response(
     doc_type: str,
     raw_ocr: Dict[str, Any],
     normalized: Dict[str, Any],
+    forensics: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
-    validation = validator.validate_document(doc_type, normalized)
+    validation = validator.validate_document(doc_type, normalized, forensics)
     return {
         "document_type": doc_type,
         "ocr_status": "completed",
         "ocr_data": mask_sensitive(doc_type, raw_ocr),
         "normalized_data": mask_sensitive(doc_type, dict(normalized)),
         "local_validation": validation,
+        "forensics": forensics or {},
         "official_verification_status": "not_performed",
         "timestamp": now_iso(),
     }
@@ -526,12 +529,17 @@ async def _process_single_upload(
     ensure_file_size(upload, content)
 
     images = file_to_images(upload, content, doc_type)
+    
+    # Run Forensics (EXIF + ELA) on first page/image
+    forensics = run_forensics(images[0]) if images else {"is_tampered": False, "reason": ""}
+
     raw, used_provider = await run_ocr(doc_type, images, provider)
     normalized = normalize_document_fields(doc_type, raw)
-    validation = validator.validate_document(doc_type, normalized)
+    validation = validator.validate_document(doc_type, normalized, forensics)
 
     return {
         "provider_used": used_provider,
+        "forensics": forensics,
         "ocr_data": mask_sensitive(doc_type, raw),
         "normalized_data": mask_sensitive(doc_type, dict(normalized)),
         "local_validation": validation,
@@ -578,9 +586,10 @@ async def ocr_pan(
     content = await file.read()
     ensure_file_size(file, content)
     images = file_to_images(file, content, "pan")
+    forensics = run_forensics(images[0]) if images else {"is_tampered": False, "reason": ""}
     raw, _ = await run_ocr("pan", images, provider)
     normalized = normalize_document_fields("pan", raw)
-    return build_local_validation_response("pan", raw, normalized)
+    return build_local_validation_response("pan", raw, normalized, forensics)
 
 
 @app.post("/ocr/aadhaar")
@@ -594,9 +603,10 @@ async def ocr_aadhaar(
     content = await file.read()
     ensure_file_size(file, content)
     images = file_to_images(file, content, "aadhaar")
+    forensics = run_forensics(images[0]) if images else {"is_tampered": False, "reason": ""}
     raw, _ = await run_ocr("aadhaar", images, provider)
     normalized = normalize_document_fields("aadhaar", raw)
-    return build_local_validation_response("aadhaar", raw, normalized)
+    return build_local_validation_response("aadhaar", raw, normalized, forensics)
 
 
 @app.post("/ocr/bank")
@@ -618,9 +628,10 @@ async def ocr_bank(
     content = await file.read()
     ensure_file_size(file, content)
     images = file_to_images(file, content, "bank")
+    forensics = run_forensics(images[0]) if images else {"is_tampered": False, "reason": ""}
     raw, _ = await run_ocr("bank", images, provider)
     normalized = normalize_document_fields("bank", raw)
-    return build_local_validation_response("bank", raw, normalized)
+    return build_local_validation_response("bank", raw, normalized, forensics)
 
 
 @app.post("/kyc/compare")
